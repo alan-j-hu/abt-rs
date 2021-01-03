@@ -13,20 +13,12 @@ impl abt::Signature for Untyped {
     type Sort = ();
 
     fn arity(op: &Op) -> abt::Arity<()> {
-        match *op {
-            Op::App =>
-                abt::Arity::new(
-                    vec![
-                        abt::Valence::new(vec![], ()),
-                        abt::Valence::new(vec![], ())
-                    ],
-                    ()
-                ),
-            Op::Lam =>
-                abt::Arity::new(
-                    vec![abt::Valence::new(vec![()], ())],
-                    ()
-                ),
+        match op {
+            Op::App => abt::Arity::new(
+                vec![abt::Valence::new(vec![], ()), abt::Valence::new(vec![], ())],
+                (),
+            ),
+            Op::Lam => abt::Arity::new(vec![abt::Valence::new(vec![()], ())], ()),
         }
     }
 }
@@ -40,7 +32,7 @@ fn untyped_lc() {
     assert_eq!(free.has_sort::<Untyped>(&(), empty), false);
     let app_id = abt::Abt::Op(
         Op::App,
-        vec![abt::Abs(0, id.clone()), abt::Abs(0, id.clone())]
+        vec![abt::Abs(0, id.clone()), abt::Abs(0, id.clone())],
     );
     assert_eq!(app_id.has_sort::<Untyped>(&(), empty), true)
 }

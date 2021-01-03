@@ -1,6 +1,6 @@
 pub enum Context<'a, T> {
     Empty,
-    Bindings(&'a Context<'a, T>, &'a Vec<T>)
+    Bindings(&'a Context<'a, T>, &'a Vec<T>),
 }
 
 impl<'a, T> Context<'a, T> {

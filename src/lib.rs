@@ -36,25 +36,20 @@ pub enum Abt<Op> {
 }
 
 impl<Op> Abt<Op> {
-    pub fn has_sort<'a, Sig>(
-        &self, sort: &Sig::Sort, con: &'a Context<'a, Sig::Sort>
-    ) -> bool
-    where Sig: Signature<Op=Op>
+    pub fn has_sort<'a, Sig>(&self, sort: &Sig::Sort, con: &'a Context<'a, Sig::Sort>) -> bool
+    where
+        Sig: Signature<Op = Op>,
     {
         match *self {
-            Self::Var(var) => {
-                match con.lookup(var) {
-                    None => false,
-                    Some(var_sort) => sort == var_sort
-                }
+            Self::Var(var) => match con.lookup(var) {
+                None => false,
+                Some(var_sort) => sort == var_sort,
             },
             Self::Op(ref operator, ref operands) => {
                 let Arity { inputs, output } = Sig::arity(operator);
                 operands.iter().zip(inputs.iter()).fold(
                     inputs.len() == operands.len() && output == *sort,
-                    |acc, (abs, valence)| {
-                        acc && abs.has_valence::<Sig>(valence, con)
-                    }
+                    |acc, (abs, valence)| acc && abs.has_valence::<Sig>(valence, con),
                 )
             }
         }
@@ -67,15 +62,17 @@ pub struct Abs<Op>(pub usize, pub Abt<Op>);
 
 impl<Op> Abs<Op> {
     pub fn has_valence<'a, Sig>(
-        &self, valence: &Valence<Sig::Sort>, con: &'a Context<'a, Sig::Sort>
+        &self,
+        valence: &Valence<Sig::Sort>,
+        con: &'a Context<'a, Sig::Sort>,
     ) -> bool
-    where Sig: Signature<Op=Op>
+    where
+        Sig: Signature<Op = Op>,
     {
-        self.0 == valence.inputs.len() &&
-            self.1.has_sort::<Sig>(
-                &valence.output,
-                &Context::Bindings(con, &valence.inputs)
-            )
+        self.0 == valence.inputs.len()
+            && self
+                .1
+                .has_sort::<Sig>(&valence.output, &Context::Bindings(con, &valence.inputs))
     }
 }
 
