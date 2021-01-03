@@ -1,4 +1,5 @@
 use abt;
+use smallvec::smallvec;
 
 #[derive(Clone)]
 enum Op {
@@ -15,10 +16,13 @@ impl abt::Signature for Untyped {
     fn arity(op: &Op) -> abt::Arity<()> {
         match op {
             Op::App => abt::Arity::new(
-                vec![abt::Valence::new(vec![], ()), abt::Valence::new(vec![], ())],
+                smallvec![
+                    abt::Valence::new(smallvec![], ()),
+                    abt::Valence::new(smallvec![], ())
+                ],
                 (),
             ),
-            Op::Lam => abt::Arity::new(vec![abt::Valence::new(vec![()], ())], ()),
+            Op::Lam => abt::Arity::new(smallvec![abt::Valence::new(smallvec![()], ())], ()),
         }
     }
 }

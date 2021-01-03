@@ -1,6 +1,8 @@
+use smallvec::SmallVec;
+
 pub enum Context<'a, T> {
     Empty,
-    Bindings(&'a Context<'a, T>, &'a Vec<T>),
+    Bindings(&'a Context<'a, T>, &'a SmallVec<[T; 4]>),
 }
 
 impl<'a, T> Context<'a, T> {

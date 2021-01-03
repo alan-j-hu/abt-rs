@@ -1,16 +1,17 @@
 pub mod context;
 
 use context::Context;
+use smallvec::SmallVec;
 
 /// An arity is the "type" of an operator.
 #[derive(PartialEq, Eq)]
 pub struct Arity<Sort> {
-    inputs: Vec<Valence<Sort>>,
+    inputs: SmallVec<[Valence<Sort>; 4]>,
     output: Sort,
 }
 
 impl<Sort> Arity<Sort> {
-    pub fn new(inputs: Vec<Valence<Sort>>, output: Sort) -> Self {
+    pub fn new(inputs: SmallVec<[Valence<Sort>; 4]>, output: Sort) -> Self {
         Arity { inputs, output }
     }
 }
@@ -18,12 +19,12 @@ impl<Sort> Arity<Sort> {
 /// Valence describes the input to an operator.
 #[derive(PartialEq, Eq)]
 pub struct Valence<Sort> {
-    inputs: Vec<Sort>,
+    inputs: SmallVec<[Sort; 4]>,
     output: Sort,
 }
 
 impl<Sort> Valence<Sort> {
-    pub fn new(inputs: Vec<Sort>, output: Sort) -> Self {
+    pub fn new(inputs: SmallVec<[Sort; 4]>, output: Sort) -> Self {
         Valence { inputs, output }
     }
 }
