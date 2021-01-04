@@ -55,7 +55,7 @@ impl<Op, Sort> Abt<Op, Sort> {
                     rands
                         .iter()
                         .map(|Abs(sorts, body)| Abs(sorts.clone(), go(body, vars, k + sorts.len())))
-                        .collect::<Vec<_>>(),
+                        .collect(),
                 )),
             }
         }
@@ -103,7 +103,7 @@ impl<Op, Sort> Abs<Op, Sort> {
                     rands
                         .iter()
                         .map(|Abs(sorts, body)| Abs(sorts.clone(), go(body, vars, k + sorts.len())))
-                        .collect::<Vec<_>>(),
+                        .collect(),
                 )),
             }
         }
