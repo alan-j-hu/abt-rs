@@ -29,14 +29,14 @@ impl abt::Signature for Untyped {
 
 #[test]
 fn untyped_lc() {
-    let empty = &abt::context::Context::Empty;
-    let id = abt::Abt::Op(Op::Lam, vec![abt::Abs(1, abt::Abt::Var(0))]);
-    assert_eq!(id.has_sort::<Untyped>(&(), empty), true);
-    let free = abt::Abt::Var(0);
-    assert_eq!(free.has_sort::<Untyped>(&(), empty), false);
-    let app_id = abt::Abt::Op(
-        Op::App,
-        vec![abt::Abs(0, id.clone()), abt::Abs(0, id.clone())],
-    );
-    assert_eq!(app_id.has_sort::<Untyped>(&(), empty), true)
+    let mut supply = abt::var::Supply::default();
+    let var = supply.fresh(());
+    let x = abt::View::Var(var.clone()).to_abt::<Untyped>().unwrap();
+    let abs = x.bind(&[var.clone()]);
+    let id_fun = abt::View::Op(Op::Lam, vec![abs])
+        .to_abt::<Untyped>()
+        .unwrap();
+    let _app_id = abt::View::Op(Op::App, vec![id_fun.bind(&[]), id_fun.bind(&[])])
+        .to_abt::<Untyped>()
+        .unwrap();
 }
