@@ -1,5 +1,4 @@
 use abt;
-use smallvec::smallvec;
 
 #[derive(Clone)]
 enum Op {
@@ -9,20 +8,20 @@ enum Op {
 
 struct Untyped;
 
+const APP: abt::Arity<()> = abt::Arity::new(
+    &[abt::Valence::new(&[], ()), abt::Valence::new(&[], ())],
+    (),
+);
+const LAM: abt::Arity<()> = abt::Arity::new(&[abt::Valence::new(&[()], ())], ());
+
 impl abt::Signature for Untyped {
     type Op = Op;
     type Sort = ();
 
-    fn arity(op: &Op) -> abt::Arity<()> {
+    fn arity(op: &Op) -> &'static abt::Arity<()> {
         match op {
-            Op::App => abt::Arity::new(
-                smallvec![
-                    abt::Valence::new(smallvec![], ()),
-                    abt::Valence::new(smallvec![], ())
-                ],
-                (),
-            ),
-            Op::Lam => abt::Arity::new(smallvec![abt::Valence::new(smallvec![()], ())], ()),
+            Op::App => &APP,
+            Op::Lam => &LAM,
         }
     }
 }

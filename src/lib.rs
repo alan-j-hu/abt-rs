@@ -1,39 +1,36 @@
-pub mod context;
 pub mod var;
 
-use context::Context;
-use smallvec::SmallVec;
 use var::{Supply, Var};
 
 /// An arity is the "type" of an operator.
 #[derive(PartialEq, Eq)]
-pub struct Arity<Sort> {
-    inputs: SmallVec<[Valence<Sort>; 4]>,
+pub struct Arity<Sort: 'static> {
+    inputs: &'static [Valence<Sort>],
     output: Sort,
 }
 
-impl<Sort> Arity<Sort> {
-    pub fn new(inputs: SmallVec<[Valence<Sort>; 4]>, output: Sort) -> Self {
+impl<Sort: 'static> Arity<Sort> {
+    pub const fn new(inputs: &'static [Valence<Sort>], output: Sort) -> Self {
         Arity { inputs, output }
     }
 }
 
 /// Valence describes the input to an operator.
 #[derive(PartialEq, Eq)]
-pub struct Valence<Sort> {
-    inputs: SmallVec<[Sort; 4]>,
+pub struct Valence<Sort: 'static> {
+    inputs: &'static [Sort],
     output: Sort,
 }
 
-impl<Sort> Valence<Sort> {
-    pub fn new(inputs: SmallVec<[Sort; 4]>, output: Sort) -> Self {
+impl<Sort: 'static> Valence<Sort> {
+    pub const fn new(inputs: &'static [Sort], output: Sort) -> Self {
         Valence { inputs, output }
     }
 }
 
 /// Abstract binding tree.
 #[derive(Clone)]
-pub enum Abt<Op, Sort> {
+pub enum Abt<Op, Sort: 'static> {
     BV(usize),
     FV(Var<Sort>),
     Op(Op, Vec<Abs<Op, Sort>>),
@@ -47,7 +44,7 @@ impl<Op, Sort> Abt<Op, Sort> {
         match self {
             Abt::BV(idx) => sorts[sorts.len() - idx].clone(),
             Abt::FV(v) => v.sort().clone(),
-            Abt::Op(rator, _) => Sig::arity(rator).output,
+            Abt::Op(rator, _) => Sig::arity(rator).output.clone(),
         }
     }
 
@@ -85,9 +82,9 @@ impl<Op, Sort> Abt<Op, Sort> {
 
 /// Abstraction.
 #[derive(Clone)]
-pub struct Abs<Op, Sort>(pub Vec<Sort>, pub Abt<Op, Sort>);
+pub struct Abs<Op, Sort: 'static>(pub Vec<Sort>, pub Abt<Op, Sort>);
 
-impl<Op, Sort> Abs<Op, Sort> {
+impl<Op, Sort: 'static> Abs<Op, Sort> {
     pub fn unbind(&self, supply: &mut Supply) -> (Vec<Var<Sort>>, Abt<Op, Sort>)
     where
         Op: Clone,
@@ -125,12 +122,12 @@ impl<Op, Sort> Abs<Op, Sort> {
     }
 }
 
-pub enum View<Op, Sort> {
+pub enum View<Op, Sort: 'static> {
     Var(Var<Sort>),
     Op(Op, Vec<Abs<Op, Sort>>),
 }
 
-impl<Op, Sort> View<Op, Sort> {
+impl<Op, Sort: 'static> View<Op, Sort> {
     pub fn to_abt<Sig>(&self) -> Result<Abt<Op, Sort>, ()>
     where
         Op: Clone,
@@ -165,5 +162,5 @@ pub trait Signature {
     type Op;
     type Sort: Eq;
 
-    fn arity(op: &Self::Op) -> Arity<Self::Sort>;
+    fn arity(op: &Self::Op) -> &'static Arity<Self::Sort>;
 }
