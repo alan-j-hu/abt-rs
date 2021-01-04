@@ -17,7 +17,7 @@ impl<Sort> PartialEq for Var<Sort> {
     }
 }
 
-impl<Sort: 'static> Eq for Var<Sort> {}
+impl<Sort> Eq for Var<Sort> {}
 
 pub struct Supply {
     counter: i32,

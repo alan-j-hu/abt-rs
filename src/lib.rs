@@ -9,15 +9,14 @@ pub struct Valence<Sort: 'static> {
     output: Sort,
 }
 
-impl<Sort: 'static> Valence<Sort> {
+impl<Sort> Valence<Sort> {
     pub const fn new(inputs: &'static [Sort], output: Sort) -> Self {
         Valence { inputs, output }
     }
 }
 
-/// Abstract binding tree.
 #[derive(Clone)]
-pub enum Abt<Op, Sort: 'static> {
+enum AbtInner<Op, Sort> {
     BV(usize),
     FV(Var<Sort>),
     Op(Op, Vec<Abs<Op, Sort>>),
@@ -28,10 +27,10 @@ impl<Op, Sort> Abt<Op, Sort> {
     where
         Sort: Clone,
     {
-        match self {
-            Abt::BV(idx) => sorts[sorts.len() - idx].clone(),
-            Abt::FV(v) => v.sort().clone(),
-            Abt::Op(rator, _) => Sig::sort(rator),
+        match self.0 {
+            AbtInner::BV(idx) => sorts[sorts.len() - idx].clone(),
+            AbtInner::FV(ref v) => v.sort().clone(),
+            AbtInner::Op(ref rator, _) => Sig::sort(rator),
         }
     }
 
@@ -45,19 +44,19 @@ impl<Op, Sort> Abt<Op, Sort> {
             vars: &[Var<Sort>],
             k: usize,
         ) -> Abt<Op, Sort> {
-            match *abt {
-                Abt::BV(bv) => Abt::BV(bv + k),
-                Abt::FV(ref fv) => match vars.iter().position(|v| v == fv) {
-                    Some(idx) => Abt::BV(vars.len() - idx),
-                    None => Abt::FV(fv.clone()),
+            match abt.0 {
+                AbtInner::BV(bv) => Abt(AbtInner::BV(bv + k)),
+                AbtInner::FV(ref fv) => match vars.iter().position(|v| v == fv) {
+                    Some(idx) => Abt(AbtInner::BV(vars.len() - idx)),
+                    None => Abt(AbtInner::FV(fv.clone())),
                 },
-                Abt::Op(ref rator, ref rands) => Abt::Op(
+                AbtInner::Op(ref rator, ref rands) => Abt(AbtInner::Op(
                     rator.clone(),
                     rands
                         .iter()
                         .map(|Abs(sorts, body)| Abs(sorts.clone(), go(body, vars, k + sorts.len())))
                         .collect::<Vec<_>>(),
-                ),
+                )),
             }
         }
         Abs(
@@ -67,11 +66,15 @@ impl<Op, Sort> Abt<Op, Sort> {
     }
 }
 
+/// Abstract binding tree (ABT).
+#[derive(Clone)]
+pub struct Abt<Op, Sort>(AbtInner<Op, Sort>);
+
 /// Abstraction.
 #[derive(Clone)]
-pub struct Abs<Op, Sort: 'static>(pub Vec<Sort>, pub Abt<Op, Sort>);
+pub struct Abs<Op, Sort>(pub Vec<Sort>, pub Abt<Op, Sort>);
 
-impl<Op, Sort: 'static> Abs<Op, Sort> {
+impl<Op, Sort> Abs<Op, Sort> {
     pub fn unbind(&self, supply: &mut Supply) -> (Vec<Var<Sort>>, Abt<Op, Sort>)
     where
         Op: Clone,
@@ -86,22 +89,22 @@ impl<Op, Sort: 'static> Abs<Op, Sort> {
             vars: &[Var<Sort>],
             k: usize,
         ) -> Abt<Op, Sort> {
-            match *abt {
-                Abt::BV(bv) => {
+            match abt.0 {
+                AbtInner::BV(bv) => {
                     if bv < k {
-                        Abt::BV(bv)
+                        Abt(AbtInner::BV(bv))
                     } else {
-                        Abt::FV(vars[bv].clone())
+                        Abt(AbtInner::FV(vars[bv].clone()))
                     }
                 }
-                Abt::FV(ref fv) => Abt::FV(fv.clone()),
-                Abt::Op(ref rator, ref rands) => Abt::Op(
+                AbtInner::FV(ref fv) => Abt(AbtInner::FV(fv.clone())),
+                AbtInner::Op(ref rator, ref rands) => Abt(AbtInner::Op(
                     rator.clone(),
                     rands
                         .iter()
                         .map(|Abs(sorts, body)| Abs(sorts.clone(), go(body, vars, k + sorts.len())))
                         .collect::<Vec<_>>(),
-                ),
+                )),
             }
         }
         let abt = go(&self.1, &vars, 0);
@@ -109,7 +112,7 @@ impl<Op, Sort: 'static> Abs<Op, Sort> {
     }
 }
 
-pub enum View<Op, Sort: 'static> {
+pub enum View<Op, Sort> {
     Var(Var<Sort>),
     Op(Op, Vec<Abs<Op, Sort>>),
 }
@@ -122,7 +125,7 @@ impl<Op, Sort: 'static> View<Op, Sort> {
         Sig: Signature<Op = Op, Sort = Sort>,
     {
         match self {
-            Self::Var(v) => Ok(Abt::FV(v.clone())),
+            Self::Var(v) => Ok(Abt(AbtInner::FV(v.clone()))),
             Self::Op(rator, rands) => {
                 let arity = Sig::arity(rator);
                 if arity.len() == rands.len() {
@@ -133,7 +136,7 @@ impl<Op, Sort: 'static> View<Op, Sort> {
                         },
                     );
                     if ok {
-                        Ok(Abt::Op(rator.clone(), rands.clone()))
+                        Ok(Abt(AbtInner::Op(rator.clone(), rands.clone())))
                     } else {
                         Err(())
                     }
