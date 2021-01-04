@@ -127,19 +127,14 @@ impl<Op, Sort: 'static> View<Op, Sort> {
         match self {
             Self::Var(v) => Ok(Abt(AbtInner::FV(v.clone()))),
             Self::Op(rator, rands) => {
-                let arity = Sig::arity(rator);
-                if arity.len() == rands.len() {
-                    let ok = arity.iter().zip(rands.iter()).fold(
-                        true,
-                        |acc, (valence, Abs(ref sorts, ref body))| {
-                            acc && valence.output == body.sort::<Sig>(&sorts)
-                        },
-                    );
-                    if ok {
-                        Ok(Abt(AbtInner::Op(rator.clone(), rands.clone())))
-                    } else {
-                        Err(())
-                    }
+                let ok = Sig::arity(rator)
+                    .iter()
+                    .map(|valence| valence.output.clone())
+                    .eq(rands
+                        .iter()
+                        .map(|Abs(sorts, body)| body.sort::<Sig>(&sorts)));
+                if ok {
+                    Ok(Abt(AbtInner::Op(rator.clone(), rands.clone())))
                 } else {
                     Err(())
                 }
@@ -150,7 +145,7 @@ impl<Op, Sort: 'static> View<Op, Sort> {
 
 pub trait Signature {
     type Op;
-    type Sort: Eq;
+    type Sort;
 
     fn arity(op: &Self::Op) -> &'static [Valence<Self::Sort>];
     fn sort(op: &Self::Op) -> Self::Sort;
