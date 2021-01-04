@@ -2,19 +2,6 @@ pub mod var;
 
 use var::{Supply, Var};
 
-/// An arity is the "type" of an operator.
-#[derive(PartialEq, Eq)]
-pub struct Arity<Sort: 'static> {
-    inputs: &'static [Valence<Sort>],
-    output: Sort,
-}
-
-impl<Sort: 'static> Arity<Sort> {
-    pub const fn new(inputs: &'static [Valence<Sort>], output: Sort) -> Self {
-        Arity { inputs, output }
-    }
-}
-
 /// Valence describes the input to an operator.
 #[derive(PartialEq, Eq)]
 pub struct Valence<Sort: 'static> {
@@ -44,7 +31,7 @@ impl<Op, Sort> Abt<Op, Sort> {
         match self {
             Abt::BV(idx) => sorts[sorts.len() - idx].clone(),
             Abt::FV(v) => v.sort().clone(),
-            Abt::Op(rator, _) => Sig::arity(rator).output.clone(),
+            Abt::Op(rator, _) => Sig::sort(rator),
         }
     }
 
@@ -138,8 +125,8 @@ impl<Op, Sort: 'static> View<Op, Sort> {
             Self::Var(v) => Ok(Abt::FV(v.clone())),
             Self::Op(rator, rands) => {
                 let arity = Sig::arity(rator);
-                if arity.inputs.len() == rands.len() {
-                    let ok = arity.inputs.iter().zip(rands.iter()).fold(
+                if arity.len() == rands.len() {
+                    let ok = arity.iter().zip(rands.iter()).fold(
                         true,
                         |acc, (valence, Abs(ref sorts, ref body))| {
                             acc && valence.output == body.sort::<Sig>(&sorts)
@@ -162,5 +149,6 @@ pub trait Signature {
     type Op;
     type Sort: Eq;
 
-    fn arity(op: &Self::Op) -> &'static Arity<Self::Sort>;
+    fn arity(op: &Self::Op) -> &'static [Valence<Self::Sort>];
+    fn sort(op: &Self::Op) -> Self::Sort;
 }

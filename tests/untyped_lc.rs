@@ -8,21 +8,22 @@ enum Op {
 
 struct Untyped;
 
-const APP: abt::Arity<()> = abt::Arity::new(
-    &[abt::Valence::new(&[], ()), abt::Valence::new(&[], ())],
-    (),
-);
-const LAM: abt::Arity<()> = abt::Arity::new(&[abt::Valence::new(&[()], ())], ());
+const APP: &[abt::Valence<()>] = &[abt::Valence::new(&[], ()), abt::Valence::new(&[], ())];
+const LAM: &[abt::Valence<()>] = &[abt::Valence::new(&[()], ())];
 
 impl abt::Signature for Untyped {
     type Op = Op;
     type Sort = ();
 
-    fn arity(op: &Op) -> &'static abt::Arity<()> {
+    fn arity(op: &Op) -> &'static [abt::Valence<()>] {
         match op {
-            Op::App => &APP,
-            Op::Lam => &LAM,
+            Op::App => APP,
+            Op::Lam => LAM,
         }
+    }
+
+    fn sort(_: &Op) -> () {
+        ()
     }
 }
 
