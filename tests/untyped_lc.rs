@@ -27,18 +27,19 @@ fn untyped_lc() {
     let mut supply = abt::var::Supply::default();
     let var = supply.fresh(());
     let x = abt::View::Var(var.clone()).to_abt().unwrap();
-    let abs = x.bind(&[var.clone()]);
+    let abs = abt::AbsView(vec![var], x);
 
     let id_fun = abt::View::Op(Op::Lam, vec![abs.clone()]).to_abt().unwrap();
-    assert_eq!(id_fun.view(), abt::View::Op(Op::Lam, vec![abs.clone()]));
 
-    let app_id = abt::View::Op(Op::App, vec![id_fun.bind(&[]), id_fun.bind(&[])])
-        .to_abt()
-        .unwrap();
-    assert_eq!(
-        app_id.view(),
-        abt::View::Op(Op::App, vec![id_fun.bind(&[]), id_fun.bind(&[])])
+    let _app_id = abt::View::Op(
+        Op::App,
+        vec![
+            abt::AbsView(vec![], id_fun.clone()),
+            abt::AbsView(vec![], id_fun.clone()),
+        ],
     )
+    .to_abt()
+    .unwrap();
 }
 
 #[test]
@@ -46,7 +47,7 @@ fn malformed() {
     let mut supply = abt::var::Supply::default();
     let var = supply.fresh(());
     let x = abt::View::Var(var.clone()).to_abt().unwrap();
-    let abs = x.bind(&[]);
+    let abs = abt::AbsView(vec![], x);
 
     assert_eq!(abt::View::Op(Op::Lam, vec![abs.clone()]).to_abt(), Err(()))
 }

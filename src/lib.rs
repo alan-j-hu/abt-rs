@@ -23,7 +23,7 @@ pub trait Operator<Sort> {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum AbtInner<Op, Sort> {
-    // The first usize is the De Bruijn index. The second usize is the index
+    // The first field is the De Bruijn index. The second field is the index
     // into the abstraction corresponding to the De Bruijn index.
     BV(usize, usize),
     FV(Var<Sort>),
@@ -50,7 +50,7 @@ impl<Op, Sort> Abt<Op, Sort> {
         }
     }
 
-    pub fn view(&self) -> View<Op, Sort>
+    pub fn view(&self, supply: &mut Supply) -> View<Op, Sort, Abt<Op, Sort>>
     where
         Op: Clone,
         Sort: Clone,
@@ -58,45 +58,17 @@ impl<Op, Sort> Abt<Op, Sort> {
         match &self.0 {
             AbtInner::BV(_, _) => panic!("Unbound bound variable!"),
             AbtInner::FV(var) => View::Var(var.clone()),
-            AbtInner::Op(rator, rands) => View::Op(rator.clone(), rands.clone()),
+            AbtInner::Op(rator, rands) => View::Op(
+                rator.clone(),
+                rands.iter().map(|abs| abs.unbind(supply)).collect(),
+            ),
         }
-    }
-
-    pub fn bind(&self, vars: &[Var<Sort>]) -> Abs<Op, Sort>
-    where
-        Op: Clone,
-        Sort: Clone,
-    {
-        fn go<Op: Clone, Sort: Clone>(
-            abt: &Abt<Op, Sort>,
-            vars: &[Var<Sort>],
-            k: usize,
-        ) -> Abt<Op, Sort> {
-            match abt.0 {
-                AbtInner::BV(i, j) => Abt(AbtInner::BV(i + k, j)),
-                AbtInner::FV(ref fv) => match vars.iter().position(|v| v == fv) {
-                    Some(idx) => Abt(AbtInner::BV(0, idx)),
-                    None => Abt(AbtInner::FV(fv.clone())),
-                },
-                AbtInner::Op(ref rator, ref rands) => Abt(AbtInner::Op(
-                    rator.clone(),
-                    rands
-                        .iter()
-                        .map(|Abs(sorts, body)| Abs(sorts.clone(), go(body, vars, k + sorts.len())))
-                        .collect(),
-                )),
-            }
-        }
-        Abs(
-            vars.iter().map(|v| v.sort().clone()).collect(),
-            go(self, vars, 1),
-        )
     }
 }
 
 /// Abstraction.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Abs<Op, Sort>(pub Vec<Sort>, pub Abt<Op, Sort>);
+pub struct Abs<Op, Sort>(Vec<Sort>, Abt<Op, Sort>);
 
 impl<Op, Sort> Abs<Op, Sort> {
     pub fn valence(&self) -> Valence<Sort>
@@ -107,7 +79,7 @@ impl<Op, Sort> Abs<Op, Sort> {
         Valence::new(&self.0, self.1.sort(&self.0))
     }
 
-    pub fn unbind(&self, supply: &mut Supply) -> (Vec<Var<Sort>>, Abt<Op, Sort>)
+    pub fn unbind(&self, supply: &mut Supply) -> AbsView<Sort, Abt<Op, Sort>>
     where
         Op: Clone,
         Sort: Clone,
@@ -138,17 +110,34 @@ impl<Op, Sort> Abs<Op, Sort> {
             }
         }
         let abt = go(&self.1, &vars, 0);
-        (vars, abt)
+        AbsView(vars, abt)
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum View<Op, Sort> {
+pub enum View<Op, Sort, T> {
     Var(Var<Sort>),
-    Op(Op, Vec<Abs<Op, Sort>>),
+    Op(Op, Vec<AbsView<Sort, T>>),
 }
 
-impl<Op, Sort> View<Op, Sort> {
+impl<Op, Sort, T> View<Op, Sort, T> {
+    pub fn map<U, F>(&self, mut f: F) -> View<Op, Sort, U>
+    where
+        Op: Clone,
+        Sort: Clone,
+        F: FnMut(&T) -> U,
+    {
+        match self {
+            View::Var(v) => View::Var(v.clone()),
+            View::Op(rator, rands) => View::Op(
+                rator.clone(),
+                rands.iter().map(|abs| abs.map(|x| f(x))).collect(),
+            ),
+        }
+    }
+}
+
+impl<Op, Sort> View<Op, Sort, Abt<Op, Sort>> {
     pub fn to_abt(&self) -> Result<Abt<Op, Sort>, ()>
     where
         Op: Clone + Operator<Sort>,
@@ -157,17 +146,64 @@ impl<Op, Sort> View<Op, Sort> {
         match self {
             Self::Var(v) => Ok(Abt(AbtInner::FV(v.clone()))),
             Self::Op(rator, rands) => {
+                let abs: Vec<_> = rands.iter().map(|abs| abs.bind()).collect();
                 let ok = rator
                     .arity()
                     .iter()
                     .cloned()
-                    .eq(rands.iter().map(|abs| abs.valence()));
+                    .eq(abs.iter().map(|abs| abs.valence()));
                 if ok {
-                    Ok(Abt(AbtInner::Op(rator.clone(), rands.clone())))
+                    Ok(Abt(AbtInner::Op(rator.clone(), abs)))
                 } else {
                     Err(())
                 }
             }
         }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AbsView<Sort, T>(pub Vec<Var<Sort>>, pub T);
+
+impl<Sort, T> AbsView<Sort, T> {
+    pub fn map<U, F>(&self, f: F) -> AbsView<Sort, U>
+    where
+        Sort: Clone,
+        F: FnOnce(&T) -> U,
+    {
+        AbsView(self.0.clone(), f(&self.1))
+    }
+}
+
+impl<Op, Sort> AbsView<Sort, Abt<Op, Sort>> {
+    pub fn bind(&self) -> Abs<Op, Sort>
+    where
+        Op: Clone,
+        Sort: Clone,
+    {
+        fn go<Op: Clone, Sort: Clone>(
+            abt: &Abt<Op, Sort>,
+            vars: &[Var<Sort>],
+            k: usize,
+        ) -> Abt<Op, Sort> {
+            match abt.0 {
+                AbtInner::BV(i, j) => Abt(AbtInner::BV(i + k, j)),
+                AbtInner::FV(ref fv) => match vars.iter().position(|v| v == fv) {
+                    Some(idx) => Abt(AbtInner::BV(0, idx)),
+                    None => Abt(AbtInner::FV(fv.clone())),
+                },
+                AbtInner::Op(ref rator, ref rands) => Abt(AbtInner::Op(
+                    rator.clone(),
+                    rands
+                        .iter()
+                        .map(|Abs(sorts, body)| Abs(sorts.clone(), go(body, vars, k + 1)))
+                        .collect(),
+                )),
+            }
+        }
+        Abs(
+            self.0.iter().map(|v| v.sort().clone()).collect(),
+            go(&self.1, &self.0, 1),
+        )
     }
 }
