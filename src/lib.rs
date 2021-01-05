@@ -1,5 +1,6 @@
 pub mod var;
 
+use std::cmp::Ordering;
 use var::{Supply, Var};
 
 /// Valence describes the input to an operator.
@@ -17,7 +18,9 @@ impl<Sort> Valence<Sort> {
 
 #[derive(Clone)]
 enum AbtInner<Op, Sort> {
-    BV(usize),
+    // The first usize is the De Bruijn index. The second usize is the index
+    // into the abstraction corresponding to the De Bruijn index.
+    BV(usize, usize),
     FV(Var<Sort>),
     Op(Op, Vec<Abs<Op, Sort>>),
 }
@@ -28,7 +31,10 @@ impl<Op, Sort> Abt<Op, Sort> {
         Sort: Clone,
     {
         match self.0 {
-            AbtInner::BV(idx) => sorts[sorts.len() - idx].clone(),
+            AbtInner::BV(i, j) => {
+                assert_eq!(i, 0);
+                sorts[j].clone()
+            }
             AbtInner::FV(ref v) => v.sort().clone(),
             AbtInner::Op(ref rator, _) => Sig::sort(rator),
         }
@@ -45,9 +51,9 @@ impl<Op, Sort> Abt<Op, Sort> {
             k: usize,
         ) -> Abt<Op, Sort> {
             match abt.0 {
-                AbtInner::BV(bv) => Abt(AbtInner::BV(bv + k)),
+                AbtInner::BV(i, j) => Abt(AbtInner::BV(i + k, j)),
                 AbtInner::FV(ref fv) => match vars.iter().position(|v| v == fv) {
-                    Some(idx) => Abt(AbtInner::BV(vars.len() - idx)),
+                    Some(idx) => Abt(AbtInner::BV(0, idx)),
                     None => Abt(AbtInner::FV(fv.clone())),
                 },
                 AbtInner::Op(ref rator, ref rands) => Abt(AbtInner::Op(
@@ -90,19 +96,17 @@ impl<Op, Sort> Abs<Op, Sort> {
             k: usize,
         ) -> Abt<Op, Sort> {
             match abt.0 {
-                AbtInner::BV(bv) => {
-                    if bv < k {
-                        Abt(AbtInner::BV(bv))
-                    } else {
-                        Abt(AbtInner::FV(vars[bv].clone()))
-                    }
-                }
+                AbtInner::BV(i, j) => match i.cmp(&k) {
+                    Ordering::Less => Abt(AbtInner::BV(i, j)),
+                    Ordering::Equal => Abt(AbtInner::FV(vars[j].clone())),
+                    Ordering::Greater => panic!("De Bruijn index too large!"),
+                },
                 AbtInner::FV(ref fv) => Abt(AbtInner::FV(fv.clone())),
                 AbtInner::Op(ref rator, ref rands) => Abt(AbtInner::Op(
                     rator.clone(),
                     rands
                         .iter()
-                        .map(|Abs(sorts, body)| Abs(sorts.clone(), go(body, vars, k + sorts.len())))
+                        .map(|Abs(sorts, body)| Abs(sorts.clone(), go(body, vars, k + 1)))
                         .collect(),
                 )),
             }
