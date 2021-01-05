@@ -16,12 +16,9 @@ impl<'a, Sort> Valence<'a, Sort> {
     }
 }
 
-pub trait Signature {
-    type Op;
-    type Sort;
-
-    fn arity<'a>(op: &Self::Op) -> &'a [Valence<Self::Sort>];
-    fn sort(op: &Self::Op) -> Self::Sort;
+pub trait Operator<Sort> {
+    fn arity<'a>(&self) -> &'a [Valence<Sort>];
+    fn sort(&self) -> Sort;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -38,8 +35,9 @@ enum AbtInner<Op, Sort> {
 pub struct Abt<Op, Sort>(AbtInner<Op, Sort>);
 
 impl<Op, Sort> Abt<Op, Sort> {
-    pub fn sort<Sig: Signature<Op = Op, Sort = Sort>>(&self, sorts: &[Sort]) -> Sort
+    pub fn sort(&self, sorts: &[Sort]) -> Sort
     where
+        Op: Operator<Sort>,
         Sort: Clone,
     {
         match self.0 {
@@ -48,7 +46,7 @@ impl<Op, Sort> Abt<Op, Sort> {
                 sorts[j].clone()
             }
             AbtInner::FV(ref v) => v.sort().clone(),
-            AbtInner::Op(ref rator, _) => Sig::sort(rator),
+            AbtInner::Op(ref rator, _) => rator.sort(),
         }
     }
 
@@ -101,12 +99,12 @@ impl<Op, Sort> Abt<Op, Sort> {
 pub struct Abs<Op, Sort>(pub Vec<Sort>, pub Abt<Op, Sort>);
 
 impl<Op, Sort> Abs<Op, Sort> {
-    pub fn valence<Sig>(&self) -> Valence<Sort>
+    pub fn valence(&self) -> Valence<Sort>
     where
-        Sig: Signature<Op = Op, Sort = Sort>,
+        Op: Operator<Sort>,
         Sort: Clone,
     {
-        Valence::new(&self.0, self.1.sort::<Sig>(&self.0))
+        Valence::new(&self.0, self.1.sort(&self.0))
     }
 
     pub fn unbind(&self, supply: &mut Supply) -> (Vec<Var<Sort>>, Abt<Op, Sort>)
@@ -151,19 +149,19 @@ pub enum View<Op, Sort> {
 }
 
 impl<Op, Sort> View<Op, Sort> {
-    pub fn to_abt<Sig>(&self) -> Result<Abt<Op, Sort>, ()>
+    pub fn to_abt(&self) -> Result<Abt<Op, Sort>, ()>
     where
-        Op: Clone,
+        Op: Clone + Operator<Sort>,
         Sort: Clone + Eq,
-        Sig: Signature<Op = Op, Sort = Sort>,
     {
         match self {
             Self::Var(v) => Ok(Abt(AbtInner::FV(v.clone()))),
             Self::Op(rator, rands) => {
-                let ok = Sig::arity(rator)
+                let ok = rator
+                    .arity()
                     .iter()
                     .cloned()
-                    .eq(rands.iter().map(|abs| abs.valence::<Sig>()));
+                    .eq(rands.iter().map(|abs| abs.valence()));
                 if ok {
                     Ok(Abt(AbtInner::Op(rator.clone(), rands.clone())))
                 } else {
