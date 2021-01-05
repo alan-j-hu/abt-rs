@@ -16,7 +16,7 @@ impl<Sort> Valence<Sort> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum AbtInner<Op, Sort> {
     // The first usize is the De Bruijn index. The second usize is the index
     // into the abstraction corresponding to the De Bruijn index.
@@ -37,6 +37,18 @@ impl<Op, Sort> Abt<Op, Sort> {
             }
             AbtInner::FV(ref v) => v.sort().clone(),
             AbtInner::Op(ref rator, _) => Sig::sort(rator),
+        }
+    }
+
+    pub fn view(&self) -> View<Op, Sort>
+    where
+        Op: Clone,
+        Sort: Clone,
+    {
+        match &self.0 {
+            AbtInner::BV(_, _) => panic!("Unbound bound variable!"),
+            AbtInner::FV(var) => View::Var(var.clone()),
+            AbtInner::Op(rator, rands) => View::Op(rator.clone(), rands.clone()),
         }
     }
 
@@ -66,18 +78,18 @@ impl<Op, Sort> Abt<Op, Sort> {
             }
         }
         Abs(
-            vars.iter().map(|v| v.sort().clone()).collect::<Vec<_>>(),
+            vars.iter().map(|v| v.sort().clone()).collect(),
             go(self, vars, 1),
         )
     }
 }
 
 /// Abstract binding tree (ABT).
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Abt<Op, Sort>(AbtInner<Op, Sort>);
 
 /// Abstraction.
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Abs<Op, Sort>(pub Vec<Sort>, pub Abt<Op, Sort>);
 
 impl<Op, Sort> Abs<Op, Sort> {
@@ -116,6 +128,7 @@ impl<Op, Sort> Abs<Op, Sort> {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum View<Op, Sort> {
     Var(Var<Sort>),
     Op(Op, Vec<Abs<Op, Sort>>),

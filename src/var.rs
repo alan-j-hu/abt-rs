@@ -1,4 +1,4 @@
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Var<Sort> {
     id: i32,
     sort: Sort,
