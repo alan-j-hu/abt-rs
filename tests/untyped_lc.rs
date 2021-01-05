@@ -15,7 +15,7 @@ impl abt::Signature for Untyped {
     type Op = Op;
     type Sort = ();
 
-    fn arity(op: &Op) -> &'static [abt::Valence<()>] {
+    fn arity<'a>(op: &Op) -> &'a [abt::Valence<()>] {
         match op {
             Op::App => APP,
             Op::Lam => LAM,
@@ -45,5 +45,18 @@ fn untyped_lc() {
     assert_eq!(
         app_id.view(),
         abt::View::Op(Op::App, vec![id_fun.bind(&[]), id_fun.bind(&[])])
+    )
+}
+
+#[test]
+fn malformed() {
+    let mut supply = abt::var::Supply::default();
+    let var = supply.fresh(());
+    let x = abt::View::Var(var.clone()).to_abt::<Untyped>().unwrap();
+    let abs = x.bind(&[]);
+
+    assert_eq!(
+        abt::View::Op(Op::Lam, vec![abs.clone()]).to_abt::<Untyped>(),
+        Err(())
     )
 }

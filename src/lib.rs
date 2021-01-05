@@ -4,16 +4,24 @@ use std::cmp::Ordering;
 use var::{Supply, Var};
 
 /// Valence describes the input to an operator.
-#[derive(PartialEq, Eq)]
-pub struct Valence<Sort: 'static> {
-    inputs: &'static [Sort],
+#[derive(Clone, PartialEq, Eq)]
+pub struct Valence<'a, Sort> {
+    inputs: &'a [Sort],
     output: Sort,
 }
 
-impl<Sort> Valence<Sort> {
-    pub const fn new(inputs: &'static [Sort], output: Sort) -> Self {
+impl<'a, Sort> Valence<'a, Sort> {
+    pub const fn new(inputs: &'a [Sort], output: Sort) -> Self {
         Valence { inputs, output }
     }
+}
+
+pub trait Signature {
+    type Op;
+    type Sort;
+
+    fn arity<'a>(op: &Self::Op) -> &'a [Valence<Self::Sort>];
+    fn sort(op: &Self::Op) -> Self::Sort;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -24,6 +32,10 @@ enum AbtInner<Op, Sort> {
     FV(Var<Sort>),
     Op(Op, Vec<Abs<Op, Sort>>),
 }
+
+/// Abstract binding tree (ABT).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Abt<Op, Sort>(AbtInner<Op, Sort>);
 
 impl<Op, Sort> Abt<Op, Sort> {
     pub fn sort<Sig: Signature<Op = Op, Sort = Sort>>(&self, sorts: &[Sort]) -> Sort
@@ -84,15 +96,19 @@ impl<Op, Sort> Abt<Op, Sort> {
     }
 }
 
-/// Abstract binding tree (ABT).
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Abt<Op, Sort>(AbtInner<Op, Sort>);
-
 /// Abstraction.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Abs<Op, Sort>(pub Vec<Sort>, pub Abt<Op, Sort>);
 
 impl<Op, Sort> Abs<Op, Sort> {
+    pub fn valence<Sig>(&self) -> Valence<Sort>
+    where
+        Sig: Signature<Op = Op, Sort = Sort>,
+        Sort: Clone,
+    {
+        Valence::new(&self.0, self.1.sort::<Sig>(&self.0))
+    }
+
     pub fn unbind(&self, supply: &mut Supply) -> (Vec<Var<Sort>>, Abt<Op, Sort>)
     where
         Op: Clone,
@@ -134,7 +150,7 @@ pub enum View<Op, Sort> {
     Op(Op, Vec<Abs<Op, Sort>>),
 }
 
-impl<Op, Sort: 'static> View<Op, Sort> {
+impl<Op, Sort> View<Op, Sort> {
     pub fn to_abt<Sig>(&self) -> Result<Abt<Op, Sort>, ()>
     where
         Op: Clone,
@@ -146,10 +162,8 @@ impl<Op, Sort: 'static> View<Op, Sort> {
             Self::Op(rator, rands) => {
                 let ok = Sig::arity(rator)
                     .iter()
-                    .map(|valence| valence.output.clone())
-                    .eq(rands
-                        .iter()
-                        .map(|Abs(sorts, body)| body.sort::<Sig>(&sorts)));
+                    .cloned()
+                    .eq(rands.iter().map(|abs| abs.valence::<Sig>()));
                 if ok {
                     Ok(Abt(AbtInner::Op(rator.clone(), rands.clone())))
                 } else {
@@ -158,12 +172,4 @@ impl<Op, Sort: 'static> View<Op, Sort> {
             }
         }
     }
-}
-
-pub trait Signature {
-    type Op;
-    type Sort;
-
-    fn arity(op: &Self::Op) -> &'static [Valence<Self::Sort>];
-    fn sort(op: &Self::Op) -> Self::Sort;
 }
