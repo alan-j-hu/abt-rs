@@ -207,3 +207,9 @@ impl<Op, Sort> AbsView<Sort, Abt<Op, Sort>> {
         )
     }
 }
+
+impl<Op, Sort> From<Abt<Op, Sort>> for AbsView<Sort, Abt<Op, Sort>> {
+    fn from(abt: Abt<Op, Sort>) -> AbsView<Sort, Abt<Op, Sort>> {
+        AbsView(vec![], abt)
+    }
+}

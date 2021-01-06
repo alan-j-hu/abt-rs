@@ -31,15 +31,9 @@ fn untyped_lc() {
 
     let id_fun = abt::View::Op(Op::Lam, vec![abs.clone()]).to_abt().unwrap();
 
-    let _app_id = abt::View::Op(
-        Op::App,
-        vec![
-            abt::AbsView(vec![], id_fun.clone()),
-            abt::AbsView(vec![], id_fun.clone()),
-        ],
-    )
-    .to_abt()
-    .unwrap();
+    let _app_id = abt::View::Op(Op::App, vec![id_fun.clone().into(), id_fun.clone().into()])
+        .to_abt()
+        .unwrap();
 }
 
 #[test]
