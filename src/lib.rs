@@ -1,7 +1,9 @@
 pub mod var;
+pub mod view;
 
 use std::cmp::Ordering;
 use var::{Supply, Var};
+use view::{AbsView, View};
 
 /// Valence describes the input to an operator.
 #[derive(Clone, PartialEq, Eq)]
@@ -17,7 +19,7 @@ impl<'a, Sort> Valence<'a, Sort> {
 }
 
 pub trait Operator<Sort> {
-    fn arity<'a>(&self) -> &'a [Valence<Sort>];
+    fn arity<'a>(&self) -> &'a [Valence<'a, Sort>];
     fn sort(&self) -> Sort;
 }
 
@@ -114,29 +116,6 @@ impl<Op, Sort> Abs<Op, Sort> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum View<Op, Sort, T> {
-    Var(Var<Sort>),
-    Op(Op, Vec<AbsView<Sort, T>>),
-}
-
-impl<Op, Sort, T> View<Op, Sort, T> {
-    pub fn map<U, F>(&self, mut f: F) -> View<Op, Sort, U>
-    where
-        Op: Clone,
-        Sort: Clone,
-        F: FnMut(&T) -> U,
-    {
-        match self {
-            View::Var(v) => View::Var(v.clone()),
-            View::Op(rator, rands) => View::Op(
-                rator.clone(),
-                rands.iter().map(|abs| abs.map(|x| f(x))).collect(),
-            ),
-        }
-    }
-}
-
 impl<Op, Sort> View<Op, Sort, Abt<Op, Sort>> {
     pub fn to_abt(&self) -> Result<Abt<Op, Sort>, ()>
     where
@@ -159,19 +138,6 @@ impl<Op, Sort> View<Op, Sort, Abt<Op, Sort>> {
                 }
             }
         }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct AbsView<Sort, T>(pub Vec<Var<Sort>>, pub T);
-
-impl<Sort, T> AbsView<Sort, T> {
-    pub fn map<U, F>(&self, f: F) -> AbsView<Sort, U>
-    where
-        Sort: Clone,
-        F: FnOnce(&T) -> U,
-    {
-        AbsView(self.0.clone(), f(&self.1))
     }
 }
 
