@@ -70,10 +70,10 @@ impl<Op, Sort> Abt<Op, Sort> {
 
 /// Abstraction.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Abs<Op, Sort>(Vec<Sort>, Abt<Op, Sort>);
+struct Abs<Op, Sort>(Vec<Sort>, Abt<Op, Sort>);
 
 impl<Op, Sort> Abs<Op, Sort> {
-    pub fn valence(&self) -> Valence<Sort>
+    fn valence(&self) -> Valence<Sort>
     where
         Op: Operator<Sort>,
         Sort: Clone,
@@ -81,7 +81,7 @@ impl<Op, Sort> Abs<Op, Sort> {
         Valence::new(&self.0, self.1.sort(&self.0))
     }
 
-    pub fn unbind(&self, supply: &mut Supply) -> AbsView<Sort, Abt<Op, Sort>>
+    fn unbind(&self, supply: &mut Supply) -> AbsView<Sort, Abt<Op, Sort>>
     where
         Op: Clone,
         Sort: Clone,
@@ -142,7 +142,7 @@ impl<Op, Sort> View<Op, Sort, Abt<Op, Sort>> {
 }
 
 impl<Op, Sort> AbsView<Sort, Abt<Op, Sort>> {
-    pub fn bind(&self) -> Abs<Op, Sort>
+    fn bind(&self) -> Abs<Op, Sort>
     where
         Op: Clone,
         Sort: Clone,
