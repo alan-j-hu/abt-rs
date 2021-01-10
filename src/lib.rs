@@ -66,6 +66,25 @@ impl<Op, Sort> Abt<Op, Sort> {
             ),
         }
     }
+
+    pub fn subst(&self, var: &Var<Sort>, replace: &Self) -> Self
+    where
+        Op: Clone,
+        Sort: Clone,
+    {
+        match &self.0 {
+            AbtInner::BV(i, j) => Abt(AbtInner::BV(*i, *j)),
+            AbtInner::FV(other_var) if other_var == var => replace.clone(),
+            AbtInner::FV(other_var) => Abt(AbtInner::FV(other_var.clone())),
+            AbtInner::Op(rator, rands) => Abt(AbtInner::Op(
+                rator.clone(),
+                rands
+                    .iter()
+                    .map(|Abs(sorts, body)| Abs(sorts.clone(), body.subst(var, replace)))
+                    .collect(),
+            )),
+        }
+    }
 }
 
 /// Abstraction.
@@ -99,7 +118,9 @@ impl<Op, Sort> Abs<Op, Sort> {
                 AbtInner::BV(i, j) => match i.cmp(&k) {
                     Ordering::Less => Abt(AbtInner::BV(i, j)),
                     Ordering::Equal => Abt(AbtInner::FV(vars[j].clone())),
-                    Ordering::Greater => panic!("De Bruijn index too large!"),
+                    Ordering::Greater => {
+                        panic!("De Bruijn index too large! {i} > {k}", i = i, k = k)
+                    }
                 },
                 AbtInner::FV(ref fv) => Abt(AbtInner::FV(fv.clone())),
                 AbtInner::Op(ref rator, ref rands) => Abt(AbtInner::Op(
@@ -153,9 +174,9 @@ impl<Op, Sort> AbsView<Sort, Abt<Op, Sort>> {
             k: usize,
         ) -> Abt<Op, Sort> {
             match abt.0 {
-                AbtInner::BV(i, j) => Abt(AbtInner::BV(i + k, j)),
+                AbtInner::BV(i, j) => Abt(AbtInner::BV(i, j)),
                 AbtInner::FV(ref fv) => match vars.iter().position(|v| v == fv) {
-                    Some(idx) => Abt(AbtInner::BV(0, idx)),
+                    Some(idx) => Abt(AbtInner::BV(k, idx)),
                     None => Abt(AbtInner::FV(fv.clone())),
                 },
                 AbtInner::Op(ref rator, ref rands) => Abt(AbtInner::Op(
@@ -169,7 +190,7 @@ impl<Op, Sort> AbsView<Sort, Abt<Op, Sort>> {
         }
         Abs(
             self.0.iter().map(|v| v.sort().clone()).collect(),
-            go(&self.1, &self.0, 1),
+            go(&self.1, &self.0, 0),
         )
     }
 }

@@ -22,6 +22,31 @@ impl Operator<()> for Op {
     }
 }
 
+fn cbn(term: &Abt<Op, ()>) -> Abt<Op, ()> {
+    let mut supply = var::Supply::new();
+    match term.view(&mut supply) {
+        view::View::Var(var) => view::View::Var(var.clone()).to_abt().unwrap(),
+        view::View::Op(Op::App, rands) => match rands[0].1.view(&mut supply) {
+            view::View::Var(var) => view::View::Op(
+                Op::App,
+                vec![
+                    view::View::Var(var.clone()).to_abt().unwrap().into(),
+                    rands[1].clone(),
+                ],
+            )
+            .to_abt()
+            .unwrap(),
+            view::View::Op(Op::App, _) => {
+                view::View::Op(Op::App, vec![cbn(&rands[0].1).into(), rands[1].clone()])
+                    .to_abt()
+                    .unwrap()
+            }
+            view::View::Op(Op::Lam, body) => body[0].1.subst(&body[0].0[0], &rands[1].1),
+        },
+        view::View::Op(Op::Lam, _) => term.clone(),
+    }
+}
+
 #[test]
 fn untyped_lc() {
     let mut supply = var::Supply::default();
@@ -31,9 +56,12 @@ fn untyped_lc() {
 
     let id_fun = view::View::Op(Op::Lam, vec![abs.clone()]).to_abt().unwrap();
 
-    let _app_id = view::View::Op(Op::App, vec![id_fun.clone().into(), id_fun.clone().into()])
+    let app_id = view::View::Op(Op::App, vec![id_fun.clone().into(), id_fun.clone().into()])
         .to_abt()
         .unwrap();
+    assert_eq!(id_fun, id_fun.view(&mut supply).to_abt().unwrap());
+    assert_eq!(app_id, app_id.view(&mut supply).to_abt().unwrap());
+    assert_eq!(id_fun, cbn(&app_id))
 }
 
 #[test]
